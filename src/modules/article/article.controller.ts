@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { sendResponse } from "../../utils/response";
 import { CACHE_KEYS } from "../../config/constants";
-
 import {
   createArticleService,
   deleteArticleService,

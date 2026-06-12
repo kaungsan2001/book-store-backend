@@ -39,7 +39,7 @@ export const auth = async (
       });
     }
 
-    throw createError(500, "Unauthorized", {
+    throw createError(500, "Internal Server Error", {
       code: ERRORS.INTERNAL_SERVER_ERROR,
     });
   }
