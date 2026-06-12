@@ -1,0 +1,50 @@
+{
+  "name": "backend",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/app/server.ts",
+    "prisma:gen": "bunx prisma generate",
+    "db:push": "bunx prisma db push",
+    "db:reset": "bunx prisma migrate reset",
+    "db:seed": "bunx prisma db seed",
+    "db:migrate": "bunx prisma migrate dev"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/sanitize-html": "^2.16.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@prisma/adapter-neon": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.1.0",
+    "bcrypt": "^6.0.0",
+    "bullmq": "^5.77.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "http-errors": "^2.0.1",
+    "i18next": "^26.2.0",
+    "i18next-fs-backend": "^2.6.5",
+    "i18next-http-middleware": "^3.9.6",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.3",
+    "moment": "^2.30.1",
+    "multer": "^2.1.1",
+    "prisma": "^7.8.0",
+    "sanitize-html": "^2.17.4",
+    "sharp": "^0.34.5",
+    "tsx": "^4.22.3",
+    "zod": "^4.4.3"
+  }
+}
