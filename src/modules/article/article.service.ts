@@ -1,21 +1,38 @@
 import createHttpError from "http-errors";
 import { ERRORS } from "../../config/constants";
 import { prisma } from "../../database/db";
-import type {
-  CreateArticleInput,
-  GetArticles,
-  UpdateArticle,
-} from "./article.schema";
+import type { CreateArticleInput, UpdateArticle } from "./article.schema";
 import type { Article } from "../../generated/prisma/client";
+
+/*******************
+ * HELPER FUNCTION *
+ *******************/
+const getAuthorizeArticle = async (id: string, userId: string) => {
+  const article = await prisma.article.findUnique({
+    where: { id },
+    select: { id: true, authorId: true },
+  });
+
+  if (!article)
+    throw createHttpError(404, "Article Not Found.", {
+      code: ERRORS.NOT_FOUND,
+    });
+  if (article.authorId !== userId)
+    throw createHttpError(403, "Unauthorize", {
+      code: ERRORS.FORBIDDEN,
+    });
+
+  return article;
+};
 
 /*****************************
  * CREATE AN ARTICLE SERVICE *
  *****************************/
 export const createArticleService = async (
-  inputs: CreateArticleInput,
+  inputs: CreateArticleInput & { imageUrl: string; imageId: string },
   userId: string,
 ): Promise<Article> => {
-  const { title, content, tags, category } = inputs;
+  const { title, content, tags, categoryId, imageUrl, imageId } = inputs;
   const newArticle = await prisma.article.create({
     data: {
       title,
@@ -23,11 +40,10 @@ export const createArticleService = async (
       author: {
         connect: { id: userId },
       },
+      imageUrl,
+      imageId,
       category: {
-        connectOrCreate: {
-          where: { name: category },
-          create: { name: category },
-        },
+        connect: { id: categoryId },
       },
       tags:
         tags && tags.length > 0
@@ -134,20 +150,8 @@ export const updateArticleService = async ({
   articleId: string;
   userId: string;
 }) => {
-  const { title, content, tags, category } = inputs;
-  const article = await prisma.article.findUnique({
-    where: { id: articleId },
-    select: { id: true, authorId: true },
-  });
-
-  if (!article)
-    throw createHttpError(404, "Article Not Found.", {
-      code: ERRORS.NOT_FOUND,
-    });
-  if (article.authorId !== userId)
-    throw createHttpError(403, "Unauthorize", {
-      code: ERRORS.FORBIDDEN,
-    });
+  const { title, content, tags, categoryId } = inputs;
+  await getAuthorizeArticle(articleId, userId);
 
   const updatedArticle = await prisma.article.update({
     where: { id: articleId },
@@ -155,7 +159,7 @@ export const updateArticleService = async ({
       title,
       content,
       category: {
-        connect: { name: category },
+        connect: { id: categoryId },
       },
       tags:
         tags && tags.length > 0
@@ -178,16 +182,61 @@ export const deleteArticleService = async (
   id: string,
   userId: string,
 ): Promise<Article> => {
-  const article = await prisma.article.findUnique({ where: { id } });
-  if (!article)
-    throw createHttpError(404, "Article Not Found.", {
-      code: ERRORS.NOT_FOUND,
+  await getAuthorizeArticle(id, userId);
+
+  return prisma.$transaction(async (tx) => {
+    const deletedArticle = await tx.article.delete({
+      where: { id },
     });
-  if (article.authorId !== userId)
-    throw createHttpError(403, "Unauthorized", {
-      code: ERRORS.FORBIDDEN,
+    await tx.toDeleteImage.update({
+      where: { imageId: deletedArticle.imageId },
+      data: { deletedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, // Set deletedAt to 30 days ago to force deletion during the midnight cron run.
     });
-  return await prisma.article.delete({
-    where: { id },
+    return deletedArticle;
+  });
+};
+
+/***************
+ * SOFT DELETE *
+ ***************/
+export const softDeleteArticleService = async (
+  id: string,
+  userId: string,
+): Promise<Article> => {
+  await getAuthorizeArticle(id, userId);
+
+  return prisma.$transaction(async (tx) => {
+    const deletedArticle = await tx.article.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    await tx.toDeleteImage.create({
+      data: {
+        imageId: deletedArticle.imageId,
+      },
+    });
+
+    return deletedArticle;
+  });
+};
+
+/*******************
+ * RESTORE - SOFT DELETED ARTICLE *
+ *******************/
+export const restoreArticleService = async (id: string, userId: string) => {
+  await getAuthorizeArticle(id, userId);
+
+  return prisma.$transaction(async (tx) => {
+    const restored = await tx.article.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+
+    await tx.toDeleteImage.delete({
+      where: { imageId: restored.imageId },
+    });
+
+    return restored;
   });
 };

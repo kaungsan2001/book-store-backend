@@ -1,44 +1,70 @@
 import type { Request, Response } from "express";
 import { sendResponse } from "../../utils/response";
-import { CACHE_KEYS } from "../../config/constants";
+import { CACHE_KEYS, ERRORS } from "../../config/constants";
 import {
   createArticleService,
   deleteArticleService,
   getAllArticleService,
   getArticleByIdService,
+  restoreArticleService,
+  softDeleteArticleService,
   updateArticleService,
 } from "./article.service";
 import type { AuthenticatedRequest } from "../../middlewares/auth.middleware";
 import {
   createArticleSchema,
   DeleteArticleSchema,
-  GetAtriclesSchema,
+  GetArticleByIdSchema,
+  GetAtricleListSchema,
+  RestoreArticleSchema,
   UpdateArticleSchema,
 } from "./article.schema";
 import type { ValidatedRequest } from "../../middlewares/validate.middleware";
 import { getCache, setCache } from "../../utils/cache";
+import createHttpError from "http-errors";
+import { uploadToCloudinary } from "../../utils/upload";
+import { getCategoryById } from "../category/category.service";
 
 /*****************************
  * CREATE ARTICLE CONTROLLER *
  *****************************/
 export const createArticle = async (
-  req: AuthenticatedRequest & ValidatedRequest<typeof createArticleSchema>,
+  req: AuthenticatedRequest &
+    ValidatedRequest<typeof createArticleSchema> & {
+      file?: Express.Multer.File | undefined;
+    },
   res: Response,
 ) => {
-  const { title, content, category, tags } = req.validated!.body;
+  const { title, content, categoryId, tags } = req.validated!.body;
   const userId = req.user!.id;
+
+  if (!(await getCategoryById(categoryId)))
+    throw createHttpError(404, "Category Not Found", {
+      code: ERRORS.NOT_FOUND,
+    });
+
+  if (!req.file) {
+    throw createHttpError(400, "File is required.");
+  }
+
+  const { secure_url, public_id } = await uploadToCloudinary(
+    req.file.buffer,
+    "article",
+  );
 
   const article = await createArticleService(
     {
       title,
       content,
-      category,
+      categoryId,
       tags,
+      imageUrl: secure_url,
+      imageId: public_id,
     },
     userId,
   );
   await setCache({
-    key: `${CACHE_KEYS.ARTICLES}+${article.id}`,
+    key: `${CACHE_KEYS.ARTICLES}${article.id}`,
     exp: 3600,
     data: article,
   });
@@ -53,9 +79,12 @@ export const createArticle = async (
 /***********************************
  * GET AN ARTICLE BY ID CONTROLLER *
  ***********************************/
-export const getArticle = async (req: Request, res: Response) => {
-  const articleId = req.params.id as string;
-  const cache = await getCache(`${CACHE_KEYS.ARTICLES}+${articleId}`);
+export const getArticle = async (
+  req: ValidatedRequest<typeof GetArticleByIdSchema>,
+  res: Response,
+) => {
+  const articleId = req.validated!.params.id;
+  const cache = await getCache(`${CACHE_KEYS.ARTICLES}${articleId}`);
 
   if (cache) {
     return sendResponse({ res, data: { article: cache }, message: "Article" });
@@ -63,7 +92,7 @@ export const getArticle = async (req: Request, res: Response) => {
   const article = await getArticleByIdService(articleId);
 
   await setCache({
-    key: `${CACHE_KEYS.ARTICLES}+${articleId}`,
+    key: `${CACHE_KEYS.ARTICLES}${articleId}`,
     exp: 3600,
     data: article,
   });
@@ -75,13 +104,13 @@ export const getArticle = async (req: Request, res: Response) => {
  * GET ALL ARTICLES WITH PAGINATION CONTROLLER *
  **********************************************/
 export const getAllArticle = async (
-  req: ValidatedRequest<typeof GetAtriclesSchema>,
+  req: ValidatedRequest<typeof GetAtricleListSchema>,
   res: Response,
 ) => {
   const { page, limit } = req.validated!.query;
   const skip = (page - 1) * limit;
 
-  const cache = await getCache(`${CACHE_KEYS.ARTICLES}+${limit}+${skip}`);
+  const cache = await getCache(`${CACHE_KEYS.ARTICLES}${limit}${skip}`);
 
   if (cache) {
     return sendResponse({
@@ -111,7 +140,7 @@ export const getAllArticle = async (
   };
 
   await setCache({
-    key: `${CACHE_KEYS.ARTICLES}+${limit}+${skip}`,
+    key: `${CACHE_KEYS.ARTICLES}${limit}${skip}`,
     exp: 3600,
     data: { articles, meta },
   });
@@ -157,4 +186,34 @@ export const deleteArticle = async (
   const article = await deleteArticleService(articleId, userId);
 
   sendResponse({ res, data: { article }, message: "Article Deleted." });
+};
+
+/******************
+ * // SOFT DELETE *
+ ******************/
+export const softDeleteArticle = async (
+  req: AuthenticatedRequest & ValidatedRequest<typeof DeleteArticleSchema>,
+  res: Response,
+) => {
+  const id = req.validated!.params.id;
+  const userId = req.user!.id;
+
+  const article = await softDeleteArticleService(id, userId);
+
+  sendResponse({ res, data: { article }, message: "Article Soft Deleted." });
+};
+
+/*******************
+ * RESTORE - SOFT DELETED ARTICLE *
+ *******************/
+export const restoreArticle = async (
+  req: AuthenticatedRequest & ValidatedRequest<typeof RestoreArticleSchema>,
+  res: Response,
+) => {
+  const id = req.validated!.params.id;
+  const userId = req.user!.id;
+
+  const article = await restoreArticleService(id, userId);
+
+  sendResponse({ res, data: { article }, message: "Article Restored." });
 };

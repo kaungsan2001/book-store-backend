@@ -28,4 +28,5 @@ export const CACHE_KEYS = {
   POSTS: "posts:",
   ARTICLES: "articles:",
   USERS: "users:",
+  CATEGORIES: "categories:",
 };

@@ -1,8 +1,20 @@
 import type { Request, Response } from "express";
 import { sendResponse } from "../../utils/response";
-import { deleteProductById, getProductById } from "./product.service";
+import {
+  createProduct,
+  deleteProductById,
+  getProductById,
+} from "./product.service";
 import type { ValidatedRequest } from "../../middlewares/validate.middleware";
-import type { DeleteProductSchema, GetOneSchema } from "./product.schema";
+import type {
+  CreateProductSchema,
+  DeleteProductSchema,
+  GetOneSchema,
+} from "./product.schema";
+import type { AuthenticatedRequest } from "../../middlewares/auth.middleware";
+import { getCategoryById } from "../category/category.service";
+import createHttpError from "http-errors";
+import { ERRORS } from "../../config/constants";
 
 /*****************
  * GET A PRODUCT *
@@ -24,7 +36,38 @@ export const getMany = async (req: Request, res: Response) => {};
 /**********************
  * CREATE NEW PRODUCT *
  **********************/
-export const create = async (req: Request, res: Response) => {};
+export const create = async (
+  req: AuthenticatedRequest & ValidatedRequest<typeof CreateProductSchema>,
+  res: Response,
+) => {
+  const {
+    name,
+    description,
+    categoryId,
+    discount,
+    price,
+    inventory,
+    productTag,
+  } = req.validated!.body;
+  const category = await getCategoryById(categoryId);
+
+  if (!category)
+    throw createHttpError(404, "Category not found.", {
+      code: ERRORS.NOT_FOUND,
+    });
+
+  const product = await createProduct({
+    name,
+    description,
+    categoryId,
+    discount,
+    price,
+    inventory,
+    productTag,
+  });
+
+  sendResponse({ res, data: { product }, message: "New Product" });
+};
 
 /************************
  * UPDATE PRODUCT BY ID *

@@ -81,13 +81,15 @@ model Product {
   description   String?        @db.Text()
   price         Int
   discount      Int?           @default(0)
+  inventory     Int
   categoryId    String
   category      Category       @relation(fields: [categoryId], references: [id])
   productImages ProductImage[]
   productTag    ProductTag[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([name])
 }
@@ -117,15 +119,17 @@ model Article {
   id         String       @id @default(cuid(2))
   title      String       @db.VarChar(255)
   content    String       @db.Text()
-  imageUrl   String?      @db.Text()
+  imageUrl   String       @db.Text()
+  imageId    String
   tags       ArticleTag[]
   authorId   String
   author     User         @relation(fields: [authorId], references: [id])
   category   Category     @relation(fields: [categoryId], references: [id])
   categoryId String
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model ArticleTag {
@@ -137,4 +141,14 @@ model ArticleTag {
   updatedAt DateTime @updatedAt
 
   @@index([name])
+}
+
+// Store image public_ids and delete them using a midnight cron job. 1 ->30
+model ToDeleteImage {
+  id        String   @id @default(cuid(2))
+  imageId   String   @unique
+  attempts  Int?     @db.SmallInt
+  deletedAt DateTime @default(now())
+
+  @@index([imageId])
 }

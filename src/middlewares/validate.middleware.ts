@@ -25,7 +25,7 @@ const extractFirstError = (
 
 // response format
 const validationErrorResponse = (error: ZodError) => {
-  const { fieldErrors } = flattenError(error);
+  const { fieldErrors, formErrors } = flattenError(error);
 
   return {
     success: false,
@@ -33,7 +33,8 @@ const validationErrorResponse = (error: ZodError) => {
     data: null,
     error: {
       code: ERRORS.VALIDATION_ERROR,
-      details: extractFirstError(fieldErrors),
+      details: fieldErrors,
+      formErrors,
     },
   };
 };

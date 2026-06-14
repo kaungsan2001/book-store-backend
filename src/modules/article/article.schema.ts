@@ -36,6 +36,7 @@ const escapeHtml = (value: string): string => {
 /****************************
  * CREATE AN ARTICLE SCHEMA *
  ****************************/
+
 export const createArticleSchema = z.object({
   body: z.object({
     title: z.string().trim().min(1, "Title is required").transform(escapeHtml),
@@ -47,7 +48,7 @@ export const createArticleSchema = z.object({
       .refine((sanitizied) => sanitizied.trim().length > 0, {
         error: "Content is required.",
       }),
-    category: z.string().min(1, "Category ID is required"),
+    categoryId: z.cuid2({ error: "Category Id must be a valid Id" }),
     tags: z
       .array(z.string(), { error: "Tags must be a string array" })
       .optional(),
@@ -56,17 +57,27 @@ export const createArticleSchema = z.object({
 
 export type CreateArticleInput = z.infer<typeof createArticleSchema>["body"];
 
+export const GetArticleByIdSchema = z.object({
+  params: z.object({
+    id: z.cuid2({ error: "Invalid Article ID." }),
+  }),
+});
+
+export type GetArticleByIdInput = z.infer<
+  typeof GetArticleByIdSchema
+>["params"];
+
 /********************************
  * GET ARTICLES WITH PAGINATION SCHEMA*
  ********************************/
-export const GetAtriclesSchema = z.object({
+export const GetAtricleListSchema = z.object({
   query: z.object({
     page: z.coerce.number().positive().catch(1), //safely falls back to 1 if missing, empty, or invalid.
     limit: z.coerce.number().positive().catch(10),
   }),
 });
 
-export type GetArticles = z.infer<typeof GetAtriclesSchema>["query"];
+export type GetAtricleList = z.infer<typeof GetAtricleListSchema>["query"];
 
 /*************************
  * UPDATE ARTICLE SCHEMA *
@@ -85,7 +96,7 @@ export const UpdateArticleSchema = z.object({
       .refine((sanitizied) => sanitizied.trim().length > 0, {
         error: "Content is required.",
       }),
-    category: z.string().min(1, "Category ID is required"),
+    categoryId: z.cuid2({ error: "Category ID is required" }),
     tags: z
       .array(z.string().trim(), { error: "Tags must be a string array" })
       .optional()
@@ -105,3 +116,11 @@ export const DeleteArticleSchema = z.object({
 });
 
 export type DeleteArticle = z.infer<typeof DeleteArticleSchema>["params"];
+
+export const RestoreArticleSchema = z.object({
+  params: z.object({
+    id: z.cuid2({ error: "Invalid Article ID." }),
+  }),
+});
+
+export type RestoreArticle = z.infer<typeof RestoreArticleSchema>["params"];
